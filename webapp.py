@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import requests
+from requests.auth import HTTPBasicAuth
 
 # --- CONFIGURABLE HOST LIST ---
 HOST_OPTIONS = [
@@ -8,81 +10,76 @@ HOST_OPTIONS = [
     "wd-production.workday.com"
 ]
 
-# Initialize session state for connection details if they don't exist
-if 'tenant' not in st.session_state:
-    st.session_state['tenant'] = "workdayproserv_dpt2"
-if 'user_id' not in st.session_state:
-    st.session_state['user_id'] = "wd-implementer"
-if 'host_idx' not in st.session_state:
-    st.session_state['host_idx'] = 0
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
+def test_connection(tenant, user, password, host):
+    """Attempts to connect to the Workday Tenant using Basic Auth."""
+    # Constructing a common Workday endpoint URL
+    # Note: You may need to adjust this URL path based on your specific API needs
+    url = f"https://{host}/ccx/api/v1/{tenant}"
+    
+    try:
+        # We make a simple GET request to test the credentials
+        response = requests.get(
+            url, 
+            auth=HTTPBasicAuth(user, password),
+            timeout=10
+        )
+        
+        # Check if the status code is successful (200-299)
+        if response.status_code == 200:
+            return True, "Successfully connected"
+        elif response.status_code == 401:
+            return False, "Failed: Unauthorized (Wrong Username/Password)"
+        else:
+            return False, f"Failed: Received status code {response.status_code}"
+            
+    except requests.exceptions.ConnectionError:
+        return False, "Failed: Could not connect to the host. Check the URL."
+    except Exception as e:
+        return False, f"Failed: {str(e)}"
+
 def login():
-    # Centering the login box slightly
     _, col_mid, _ = st.columns([1, 2, 1])
     
     with col_mid:
         with st.container(border=True):
             st.markdown("### Connect to a Tenant")
             
-            # These inputs now update the session_state automatically
-            tenant = st.text_input("Tenant:", value=st.session_state['tenant'])
-            user_id = st.text_input("Userid:", value=st.session_state['user_id'])
+            tenant = st.text_input("Tenant:", value="workdayproserv_dpt2")
+            user_id = st.text_input("Userid:", value="wd-implementer")
             password = st.text_input("Password:", type="password")
+            host = st.selectbox("Host:", options=HOST_OPTIONS)
             
-            # Host dropdown
-            host = st.selectbox(
-                "Host:", 
-                options=HOST_OPTIONS, 
-                index=st.session_state['host_idx']
-            )
-            
-            st.write("---") # Visual separator
+            st.write("---")
             
             col_ok, col_cancel = st.columns([1, 1])
             with col_ok:
                 if st.button("OK", use_container_width=True, type="primary"):
-                    # Save current entries to session state before logging in
-                    st.session_state['tenant'] = tenant
-                    st.session_state['user_id'] = user_id
-                    st.session_state['host_idx'] = HOST_OPTIONS.index(host)
-                    
-                    # Validation
-                    if user_id == "admin" and password == "password":
-                        st.session_state['logged_in'] = True
-                        st.rerun()
-                    else:
-                        st.error("Invalid credentials")
+                    with st.spinner("Connecting..."):
+                        success, message = test_connection(tenant, user_id, password, host)
+                        
+                        if success:
+                            st.success(message)
+                            st.session_state['logged_in'] = True
+                            st.session_state['tenant'] = tenant
+                            # Small delay so user sees the "Success" message
+                            st.rerun()
+                        else:
+                            st.error(message)
             
             with col_cancel:
                 if st.button("Cancel", use_container_width=True):
-                    st.warning("Connection cancelled.")
+                    st.info("Connection cancelled.")
 
 def main_app():
-    st.title(f"Connected: {st.session_state['tenant']}")
-    st.info(f"Logged in as: {st.session_state['user_id']} | Host: {HOST_OPTIONS[st.session_state['host_idx']]}")
-    
-    # --- Data Table Logic ---
-    if 'data' not in st.session_state:
-        st.session_state['data'] = pd.DataFrame(columns=["ID", "Name", "Value"])
-
-    with st.form("entry_form"):
-        c1, c2, c3 = st.columns(3)
-        id_v = c1.text_input("ID")
-        name_v = c2.text_input("Name")
-        val_v = c3.text_input("Value")
-        if st.form_submit_button("Add to Table"):
-            new_row = pd.DataFrame([[id_v, name_v, val_v]], columns=["ID", "Name", "Value"])
-            st.session_state['data'] = pd.concat([st.session_state['data'], new_row], ignore_index=True)
-    
-    st.dataframe(st.session_state['data'], use_container_width=True)
-    
+    st.title(f"Authenticated: {st.session_state['tenant']}")
     if st.button("Logout"):
         st.session_state['logged_in'] = False
         st.rerun()
+    # Your table code goes here...
 
-# Router
 if not st.session_state['logged_in']:
     login()
 else:
