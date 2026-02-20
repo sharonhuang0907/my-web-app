@@ -1,51 +1,39 @@
 import streamlit as st
 import pandas as pd
 
-# --- Session State to handle "Login" status ---
+# --- CONFIGURABLE HOST LIST ---
+# You can add or remove addresses from this list
+HOST_OPTIONS = [
+    "wd2-impl-services1.workday.com",
+    "wd3-impl-services2.workday.com",
+    "wd-production.workday.com"
+]
+
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 def login():
-    st.title("Secure Portal")
-    user = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    
-    if st.button("Login"):
-        if user == "admin" and password == "password":
-            st.session_state['logged_in'] = True
-            st.rerun() # Refresh to show the table
-        else:
-            st.error("Invalid credentials")
-
-def main_app():
-    st.title("Data Entry Dashboard")
-    
-    # Initialize an empty table if it doesn't exist
-    if 'data' not in st.session_state:
-        st.session_state['data'] = pd.DataFrame(columns=["ID", "Name", "Value"])
-
-    # --- Data Entry Form ---
-    with st.form("entry_form"):
-        col1, col2, col3 = st.columns(3)
-        id_val = col1.text_input("ID")
-        name_val = col2.text_input("Name")
-        value_val = col3.text_input("Value")
+    # Use a container to mimic the "Connect to a Tenant" box
+    with st.container(border=True):
+        st.subheader("Connect to a Tenant")
         
-        if st.form_submit_button("Add to Table"):
-            new_row = pd.DataFrame([[id_val, name_val, value_val]], columns=["ID", "Name", "Value"])
-            st.session_state['data'] = pd.concat([st.session_state['data'], new_row], ignore_index=True)
-            st.success("Added!")
+        # Using columns to align labels and inputs like a classic Windows dialog
+        tenant = st.text_input("Tenant:", value="workdayproserv_dpt2")
+        user_id = st.text_input("Userid:", value="wd-implementer")
+        password = st.text_input("Password:", type="password")
+        host = st.selectbox("Host:", options=HOST_OPTIONS)
+        
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("OK", use_container_width=True):
+                # Simple validation logic
+                if user_id == "admin" and password == "password":
+                    st.session_state['logged_in'] = True
+                    st.rerun()
+                else:
+                    st.error("Invalid credentials")
+        with col2:
+            if st.button("Cancel"):
+                st.info("Connection cancelled.")
 
-    # --- Display Table ---
-    st.subheader("Current Data")
-    st.table(st.session_state['data'])
-    
-    if st.button("Logout"):
-        st.session_state['logged_in'] = False
-        st.rerun()
-
-# --- Logic to switch between Login and Main App ---
-if not st.session_state['logged_in']:
-    login()
-else:
-    main_app()
+# ... rest of your main_app() code stays the same ...
