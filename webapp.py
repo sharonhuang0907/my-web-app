@@ -17,7 +17,7 @@ def test_connection(tenant, user, password, host):
     """Attempts to connect to the Workday Tenant using Basic Auth."""
     # Constructing a common Workday endpoint URL
     # Note: You may need to adjust this URL path based on your specific API needs
-    url = f"https://{host}/ccx/api/v1/{tenant}"
+    url = f"https://{host}/ccx/api/v1/{tenant}/userInfo"
     
     try:
         # We make a simple GET request to test the credentials
